@@ -16,7 +16,7 @@ if (grepl("ricard",Sys.info()['nodename'])) {
 } else {
   io$basedir <- "/homes/ricard/betabinomial_simulations/mcmc_vs_variational/complex_model"
   io$model <- "/homes/ricard/Ecker_2017/variability/bayesian_bb/lib/bb_hierarchical.stan"
-  io$outdir <- "/Users/ricard/data/betabinomial/validation"
+  io$outdir <- "/hps/nobackup2/stegle/users/ricard/betabinomial/validation"
 }
 
 ## Options ##
@@ -52,10 +52,7 @@ opts$b0_delta = 2
 opts$a0_rho = 20
 opts$b0_rho = 100
 
-###################################
-## Load data-generating function ##
-###################################
-
+# Load data-generating function
 source(paste0(io$basedir,"/load_data.R"))
 
 #################

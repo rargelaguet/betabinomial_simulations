@@ -3,20 +3,21 @@ library(purrr)
 library(rstan)
 rstan_options(auto_write = TRUE)
 
-simulate_binomial <- function(N, D, S) {
-  theta <- runif(N*D, min=0, max=1)
-  matrix(rbinom(N*D, S, theta), nrow=N, ncol=D)
-}
-
 ######################
 ## Define settings  ##
 ######################
 
 ## I/O ##
 io <- list()
-io$basedir <- "/Users/ricard/betabinomial_simulations/scalability"
-io$model <- paste0(io$basedir,"/model.R")
-io$outdir <- paste0(io$basedir,"/out"); dir.create(io$outdir, showWarnings = F)
+if (grepl("ricard",Sys.info()['nodename'])) {
+  io$basedir <- "/Users/ricard/betabinomial_simulations/scalability/complex_model"
+  io$outdir <- "/Users/ricard/data/betabinomial/scalability"
+  io$model <- "/Users/ricard/Ecker_2017/variability/bayesian_bb/lib/bb_hierarchical.stan"
+} else {
+  io$basedir <- "/homes/ricard/betabinomial_simulations/scalability/complex_model"
+  io$model <- "/homes/ricard/Ecker_2017/variability/bayesian_bb/lib/bb_hierarchical.stan"
+  io$outdir <- "/hps/nobackup2/stegle/users/ricard/betabinomial/scalability"
+}
 
 ## Options ##
 opts <- list()
@@ -37,6 +38,32 @@ opts$D <- seq(10,100, by=10)
 opts$cores <- 1
 options(mc.cores = opts$cores)
 
+# Simulation settings
+opts$N_feat = 50
+opts$N_cells = 50
+opts$N_cpgs = 15
+opts$cells_range = c(0.5, 1.0)       # min and max from runif
+opts$cpgs_range = c(1.0, 1.0)        # min and max from runif
+opts$mean_met_range = c(0.05, 0.95)  # min and max from runif
+opts$disp_met_range = c(2, 8)        # shape1 and shape2 from beta
+
+# Initialisations for the hyperparameters
+opts$a0_mu = 1
+opts$b0_mu = 1
+opts$a0_delta = 1
+opts$b0_delta = 2
+opts$a0_rho = 20
+opts$b0_rho = 100
+
+# Maximum number of iterations
+# opts$iterations <- 3000
+
+# Convergence criteria for VB
+# opts$tol_rel_obj <- 0.001
+
+# Load data-generating function
+source(paste0(io$basedir,"/load_data.R"))
+
 #######################
 ## Create stan model ##
 #######################
@@ -44,7 +71,7 @@ options(mc.cores = opts$cores)
 # Load model
 source(io$model)
 
-st_model <- stan_model(model_code = beta_binomial, model_name="beta_binomial")
+st_model <- stan_model(file = io$model, model_name="beta_binomial")
 
 #########################
 ## Test influence of N ##
@@ -60,22 +87,56 @@ sink(tempfile())
 for (n in opts$N) {
   for (i in 1:opts$ntrials) {
     
-    Y <- simulate_binomial(N=n, D=opts$default.D, opts$default.S)
-    
-    # MCMC
-    ptm <- proc.time()
-    for (d in 1:opts$default.D) {
-      data <- list(y=Y[,d], N=n, s=opts$default.S)
-      sampling(st_model,  data = data, chains = 1)
-    }
-    mcmc[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
+    # Simulate data
+    met <- simulate_met(
+      N_feat = opts$N_feat,
+      N_cells = n,
+      N_cpgs = opts$N_cpgs,
+      cells_range = opts$cells_range,
+      cpgs_range = opts$cpgs_range,
+      mean_met_range = opts$mean_met_range,
+      disp_met_range = opts$disp_met_range,
+      seed = i
+    )[[1]]
 
-    # ADVI
+    # Create data object for Stan
+    n_obs_cells <- met[,.N, by = c("Feature")]$N
+    
+    dat <- list(
+      N = nrow(met), 
+      J = length(n_obs_cells), 
+      y = met[ ,met_reads],
+      n = met[ ,total_reads], 
+      s = n_obs_cells, 
+      a0_mu = opts$a0_mu, 
+      b0_mu = opts$b0_mu,
+      a0_delta = opts$a0_delta, 
+      b0_delta = opts$b0_delta, 
+      a0_rho = opts$a0_rho, 
+      b0_rho = opts$b0_rho
+    )
+
+
+    # Fit MCMC
     ptm <- proc.time()
-    for (d in 1:opts$default.D) {
-      data <- list(y=Y[,d], N=n, s=opts$default.S)
-      vb(st_model,  data = data)
-    }
+    fit.mcmc <- sampling(
+      object = st_model, data = dat, chains = 1,
+      pars = c("mu","gamma", "delta", "rho"),
+      # iter = opts$iterations, 
+      cores = opts$cores
+    )
+    mcmc[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
+  
+    # Fit ADVI
+    ptm <- proc.time()
+    fit.vb <- vb(
+      object = st_model, data = dat,
+      pars = c("mu","gamma", "delta", "rho"),
+      init = 'random',
+      algorithm = "meanfield"
+      # iter = opts$iterations,
+      # tol_rel_obj = opts$tol_rel_obj
+    )
     advi[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
     
   }
