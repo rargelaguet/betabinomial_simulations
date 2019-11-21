@@ -23,11 +23,11 @@ if (grepl("ricard",Sys.info()['nodename'])) {
 opts <- list()
 
 # Number of trials per setting
-opts$ntrials <- 2
+opts$ntrials <- 10
 
 # Define ranges 
-opts$N <- seq(10,100, by=10)
-opts$D <- seq(10,100, by=10)
+opts$N <- seq(10,150, by=10)
+opts$D <- seq(10,150, by=10)
 
 # Number of cores
 opts$cores <- 1
@@ -35,8 +35,7 @@ options(mc.cores = opts$cores)
 
 # Simulation settings
 opts$N_feat = 50     # Default number of features
-# opts$N_cells = 50    # Default number of cells
-opts$N_cells = 10    # Default number of cells
+opts$N_cells = 50    # Default number of cells
 opts$N_cpgs = 15     # Number of CpGs per genomic feature
 opts$cells_range = c(0.5, 1.0)       # min and max from runif
 opts$cpgs_range = c(1.0, 1.0)        # min and max from runif
@@ -70,74 +69,73 @@ st_model <- stan_model(file = io$model, model_name="beta_binomial")
 ## Test influence of N ##
 #########################
 
-# advi <- expand.grid(opts$N, 1:opts$ntrials) %>% as.data.table %>% 
-#   setnames(c("N","trial")) %>%.[,time:=-Inf] %>% .[,inference:="ADVI"]
+advi <- expand.grid(opts$N, 1:opts$ntrials) %>% as.data.table %>%
+  setnames(c("N","trial")) %>%.[,time:=-Inf] %>% .[,inference:="ADVI"]
 
-# mcmc <- expand.grid(opts$N, 1:opts$ntrials) %>% as.data.table %>% 
-#   setnames(c("N","trial")) %>%.[,time:=-Inf] %>% .[,inference:="MCMC"]
+mcmc <- expand.grid(opts$N, 1:opts$ntrials) %>% as.data.table %>%
+  setnames(c("N","trial")) %>%.[,time:=-Inf] %>% .[,inference:="MCMC"]
 
-# sink(tempfile())
-# for (n in opts$N) {
-#   for (i in 1:opts$ntrials) {
+sink(tempfile())
+for (n in opts$N) {
+  for (i in 1:opts$ntrials) {
+
+    # Simulate data
+    met <- simulate_met(
+      N_feat = opts$N_feat,
+      N_cells = n,
+      N_cpgs = opts$N_cpgs,
+      cells_range = opts$cells_range,
+      cpgs_range = opts$cpgs_range,
+      mean_met_range = opts$mean_met_range,
+      disp_met_range = opts$disp_met_range,
+      seed = i
+    )[[1]]
+
+    # Create data object for Stan
+    n_obs_cells <- met[,.N, by = c("Feature")]$N
     
-#     # Simulate data
-#     met <- simulate_met(
-#       N_feat = opts$N_feat,
-#       N_cells = n,
-#       N_cpgs = opts$N_cpgs,
-#       cells_range = opts$cells_range,
-#       cpgs_range = opts$cpgs_range,
-#       mean_met_range = opts$mean_met_range,
-#       disp_met_range = opts$disp_met_range,
-#       seed = i
-#     )[[1]]
+    dat <- list(
+      N = nrow(met),
+      J = length(n_obs_cells),
+      y = met[ ,met_reads],
+      n = met[ ,total_reads],
+      s = n_obs_cells,
+      a0_mu = opts$a0_mu,
+      b0_mu = opts$b0_mu,
+      a0_delta = opts$a0_delta,
+      b0_delta = opts$b0_delta,
+      a0_rho = opts$a0_rho,
+      b0_rho = opts$b0_rho
+    )
 
-#     # Create data object for Stan
-#     n_obs_cells <- met[,.N, by = c("Feature")]$N
-    
-#     dat <- list(
-#       N = nrow(met), 
-#       J = length(n_obs_cells), 
-#       y = met[ ,met_reads],
-#       n = met[ ,total_reads], 
-#       s = n_obs_cells, 
-#       a0_mu = opts$a0_mu, 
-#       b0_mu = opts$b0_mu,
-#       a0_delta = opts$a0_delta, 
-#       b0_delta = opts$b0_delta, 
-#       a0_rho = opts$a0_rho, 
-#       b0_rho = opts$b0_rho
-#     )
-
-
-#     # Fit MCMC
-#     ptm <- proc.time()
-#     fit.mcmc <- sampling(
-#       object = st_model, data = dat, chains = 1,
-#       pars = c("mu","gamma", "delta", "rho"),
-#       # iter = opts$iterations, 
-#       cores = opts$cores
-#     )
-#     mcmc[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
+    # Fit MCMC
+    ptm <- proc.time()
+    fit.mcmc <- sampling(
+      object = st_model, data = dat, chains = 1,
+      pars = c("mu","gamma", "delta", "rho"),
+      # iter = opts$iterations,
+      cores = opts$cores
+    )
+    mcmc[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
   
-#     # Fit ADVI
-#     ptm <- proc.time()
-#     fit.vb <- vb(
-#       object = st_model, data = dat,
-#       pars = c("mu","gamma", "delta", "rho"),
-#       init = 'random',
-#       algorithm = "meanfield"
-#       # iter = opts$iterations,
-#       # tol_rel_obj = opts$tol_rel_obj
-#     )
-#     advi[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
+    # Fit ADVI
+    ptm <- proc.time()
+    fit.vb <- vb(
+      object = st_model, data = dat,
+      pars = c("mu","gamma", "delta", "rho"),
+      init = 'random',
+      algorithm = "meanfield"
+      # iter = opts$iterations,
+      # tol_rel_obj = opts$tol_rel_obj
+    )
+    advi[N==n & trial==i, time:=(proc.time()-ptm)["elapsed"]]
     
-#   }
-# }
-# sink()
+  }
+}
+sink()
 
-# df <- rbind(mcmc,advi)
-# fwrite(df, paste0(io$outdir, "/N.txt.gz"), col.names=T, quote=F, sep="\t")
+df <- rbind(mcmc,advi)
+fwrite(df, paste0(io$outdir, "/N.txt.gz"), col.names=T, quote=F, sep="\t")
 
 #########################
 ## Test influence of D ##
