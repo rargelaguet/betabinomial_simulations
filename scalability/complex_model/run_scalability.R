@@ -26,8 +26,10 @@ opts <- list()
 opts$ntrials <- 10
 
 # Define ranges 
-opts$N <- seq(10,150, by=10)
-opts$D <- seq(10,150, by=10)
+# opts$N <- seq(10,150, by=10)
+# opts$D <- seq(10,150, by=10)
+opts$N <- seq(160,250, by=10)
+opts$D <- seq(160,250, by=10)
 
 # Number of cores
 opts$cores <- 1
@@ -135,7 +137,7 @@ for (n in opts$N) {
 sink()
 
 df <- rbind(mcmc,advi)
-fwrite(df, paste0(io$outdir, "/N.txt.gz"), col.names=T, quote=F, sep="\t")
+fwrite(df, paste0(io$outdir, "/N_v2.txt.gz"), col.names=T, quote=F, sep="\t")
 
 #########################
 ## Test influence of D ##
@@ -208,4 +210,4 @@ for (d in opts$D) {
 sink()
 
 df <- rbind(mcmc,advi)
-fwrite(df, paste0(io$outdir, "/D.txt.gz"), col.names=T, quote=F, sep="\t")
+fwrite(df, paste0(io$outdir, "/D_v2.txt.gz"), col.names=T, quote=F, sep="\t")
