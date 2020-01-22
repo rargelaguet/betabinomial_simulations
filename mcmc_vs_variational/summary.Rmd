@@ -41,9 +41,8 @@ if (grepl("S34-R31YLVDR",Sys.info()['nodename'])) {
 ```{r}
 N_feat <- 300
 N_cpgs <- 15
-# N_cells <- c(20, 35, 50, 100, 200, 300)
-# N_cells <- c("50","100","200","300")
-N_cells <- c("50","100","300")
+N_cells <- c(20, 35, 50, 100, 200, 300)
+N_cells_subset <- c(50, 300)
 
 models <- c("MCMC","VB")
 groups <- c("A","B")
@@ -65,7 +64,7 @@ for (i in N_cells) {
 }
 ```
 
-## Plot mean vs overdispersion for the true data
+<!-- ## Plot mean vs overdispersion for the true data
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
 for (i in N_cells) {
     
@@ -86,11 +85,11 @@ for (i in N_cells) {
     )
     
 }
-```
+``` -->
 
 
 
-## Plot mean vs overdispersion for the fitted models
+<!-- ## Plot mean vs overdispersion for the fitted models
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
 for (i in N_cells) {
@@ -109,9 +108,9 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB))
   }
 }
-```
+``` -->
 
-## Compare posterior mean estimates $\mu$
+<!-- ## Compare posterior mean estimates $\mu$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
 for (i in N_cells) {
@@ -134,9 +133,9 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-```
+``` -->
 
-## Posterior overdispersion estimates $\gamma$
+<!-- ## Posterior overdispersion estimates $\gamma$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
 for (i in N_cells) {
@@ -159,10 +158,10 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-```
+``` -->
 
 
-## Posterior residual overdispersion estimates $\epsilon$
+<!-- ## Posterior residual overdispersion estimates $\epsilon$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
 for (i in N_cells) {
@@ -185,7 +184,7 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-```
+``` -->
 
 <!-- Extract summary statistics -->
 
@@ -201,10 +200,10 @@ dt <- N_cells %>% map(function(i) {
           ncells = i,
           model = j,
           group = k,
-          feature = 1:length(fit_obj$feature_names),
+          feature = fit_obj$feature_names,
           
           # epsilon
-          epsilon_true = sim_dt$epsilon_true$mu,
+          epsilon_true = NA,
           epsilon_mean = matrixStats::colMeans2(rstan::extract(fit_obj$posterior)$epsilon),
           epsilon_sd = apply(rstan::extract(fit_obj$posterior)$epsilon, 2, sd),
         
@@ -229,11 +228,12 @@ dt <- N_cells %>% map(function(i) {
 ## Plot MCMC vs VB point estimates
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
+
 for (i in unique(dt$variable)) {
   
-  to.plot <- dt[variable==i & estimate!="true"] %>%
+  to.plot <- dt[variable==i & estimate!="true" & ncells%in%N_cells_subset] %>%
     dcast(ncells+group+estimate+feature~model, value.var="value") %>%
-  .[,tmp:=sprintf("Estimate: %s, Ncells: %s",estimate,ncells)]
+    .[,tmp:=sprintf("Estimate: %s, Ncells: %s",estimate,ncells)]
   
   p <- ggscatter(to.plot, x="MCMC", y="VB", size=0.5, color="group") +
     labs(x="MCMC", y="VB") + ggtitle(i) +
@@ -249,10 +249,37 @@ for (i in unique(dt$variable)) {
 }
 ```
 
+
+## Compare to the real data 
+
+Scatterplot of mean squared errors between infered and true values, for $\gamma$ and $\mu$
+
+```{r}
+to.plot <- dt[variable%in%c("mu","gamma") & estimate%in%c("mean","true")] %>%
+  dcast(ncells+group+model+feature+variable~estimate, value.var="value") %>%
+  .[,error:=(mean-true)**2] %>%
+  .[,.(error=mean(error)),by=c("ncells","group","model","variable")] %>%
+  .[,ncells:=as.integer(ncells)] %>%
+  droplevels
+
+p <- ggboxplot(to.plot, x="ncells", y="error", fill="model") +
+  # ggtitle(sprintf("%s, Ncells=%s",i,j)) +
+  facet_wrap(~variable, scales="free") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size=rel(1.2)),
+    axis.text = element_text(size=rel(0.6)),
+    legend.position = "right"
+  )
+
+print(p)
+```
+
+
+
 ## Plot MCMC vs VB distributions
 
 ```{r fetch_distributions, echo=FALSE, message=FALSE}
-dt <- N_cells %>% map(function(i) {
+dt <- N_cells_subset %>% map(function(i) {
         models %>% map(function(j) {
           groups %>% map(function(k) {
       
@@ -288,7 +315,7 @@ min.iter <- 2500
 features <- head(unique(dt$feature), n=12)
 
 for (i in unique(dt$parameter)) {
-  for (j in N_cells) {
+  for (j in N_cells_subset) {
     
     to.plot <- dt[group=="A"] %>%
       .[parameter==i & iteration>=min.iter & feature%in%features & ncells==j] %>%
