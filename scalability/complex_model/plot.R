@@ -14,20 +14,24 @@ io$basedir <- "/Users/ricard/data/betabinomial/scalability"
 ###############################
 
 dt.N <- fread(paste0(io$basedir, "/N.txt.gz")) %>% .[,variable:="N"] %>% setnames("N","value")
-# dt.D <- fread(paste0(io$basedir, "/D.txt.gz")) %>% .[,variable:="D"] %>% setnames("D","value")
+dt.D <- fread(paste0(io$basedir, "/D.txt.gz")) %>% .[,variable:="D"] %>% setnames("D","value")
 
-# to.plot <- rbind(dt.N,dt.D) %>%
-#   .[,time:=time/60]
-to.plot <- dt.N
+to.plot <- rbind(dt.N,dt.D)
+
+dt.N <- fread(paste0(io$basedir, "/N_v2.txt.gz")) %>% .[,variable:="N"] %>% setnames("N","value")
+dt.D <- fread(paste0(io$basedir, "/D_v2.txt.gz")) %>% .[,variable:="D"] %>% setnames("D","value")
+
+to.plot <- rbindlist(list(to.plot,dt.N,dt.D))
 
 ############
 ## Filter ##
 ############
 
-# remove some outliers
-max.time <- 1e3
-
+# remove outliers
+max.time <- 500
 to.plot <- to.plot[time<max.time]
+
+to.plot %>% .[,time:=time/60]
 
 ##########
 ## Plot ##
@@ -40,3 +44,4 @@ ggline(to.plot, x="value", y="time", color="inference", add = c("mean_se"),
   theme(
     legend.title = element_blank()
   )
+
