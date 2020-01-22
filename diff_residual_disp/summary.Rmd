@@ -1,0 +1,249 @@
+---
+title: "Compare MCMC vs VB estimates"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    highlight: haddock
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, results = "hide")
+```
+
+<!-- Load modules -->
+
+```{r echo=FALSE, message=FALSE}
+# library(data.table)
+library(tidyverse)
+# library(rstan)
+library(logitnorm)
+# library(gtools)
+```
+
+<!-- Load settings -->
+
+```{r echo=FALSE, message=FALSE}
+if (grepl("S34-R31YLVDR",Sys.info()['nodename'])) {
+  stop("Fix this")
+} else if (grepl("ricard",Sys.info()['nodename'])) {
+  source("/Users/ricard/bbreg/settings.R")
+  source("/Users/ricard/bbreg/utils.R")
+  io$data_dir <- "/Users/ricard/data/betabinomial/diff_residual_disp/synthetic/rep1/"
+  io$out_dir <- "/Users/ricard/data/betabinomial/mcmc_vs_vb"
+} else{
+  stop("Computer not recognised")
+}
+```
+
+## Define data options
+```{r}
+N_feat <- 300
+N_cpgs <- 15
+# N_cells <- c(20, 35, 50, 100, 200, 300)
+N_cells <- c(100, 300)
+```
+
+## Define model_options
+```{r}
+use_mcmc <- TRUE
+```
+
+## Load simulated data
+
+(TO IMPROVE) Just load replicate 1
+```{r }
+# dt <- list()
+# for (i in 1:length(N_cells)) {
+#   file <- paste0(io$data_dir, "data_bbreg_feat", N_feat, "_cells", N_cells[i], "_cpgs", N_cpgs, ".rds")
+#   dt[[i]] <- readRDS(file)
+# }
+```
+
+## Load pre-computed models
+
+```{r}
+dt <- list()
+for (i in 1:length(N_cells)) {
+  file <- paste0(io$data_dir, "bbreg_feat", N_feat, "_cells", N_cells[i], "_cpgs", N_cpgs, "_mcmc", use_mcmc, ".rds")
+  dt[[i]] <- readRDS(file)
+}
+```
+
+## Mean - overdispersion true data
+```{r, fig.height=1.7, fig.width=4}
+for (i in 1:length(N_cells)) {
+  par(mfrow = c(1,2))
+  plot_mean_disp_data(mu = dt[[i]]$sim_dt$sim_dt_A$theta_true$mu,
+                 gamma = dt[[i]]$sim_dt$sim_dt_A$theta_true$gamma,
+                 diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                 is_logit = TRUE, title = paste0("Cells ", N_cells[i]))
+  plot_mean_disp_data(mu = dt[[i]]$sim_dt$sim_dt_B$theta_true$mu,
+                 gamma = dt[[i]]$sim_dt$sim_dt_B$theta_true$gamma,
+                 diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                 is_logit = TRUE, title = paste0("Cells ", N_cells[i]))
+}
+```
+
+
+## Mean - overdispersion fitted model
+Below we show the estimated mean methylation on the x-axis and the estimated overdispersion on the y-axis. Left facet shows the raw estimated overdispersion estimate, which clearly shows a relationship with mean. The blue line is the basis regression fit to this trend, which allows us to remove the mean-overdispersion trend, as shown on the right facet (residual overdispersion).
+```{r, echo=FALSE, fig.width=5.8, fig.height=1.9}
+for (i in 1:length(N_cells)) {
+  ggA <- plot_mean_disp_fit(fit_obj = dt[[i]]$fit_bbreg_A, 
+                            diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx, 
+                            title = paste0("Group A - Cells ", N_cells[i]))
+  ggB <- plot_mean_disp_fit(fit_obj = dt[[i]]$fit_bbreg_B, 
+                            diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx, 
+                            title = paste0("Group B - Cells ", N_cells[i]))
+  print(cowplot::plot_grid(ggA, ggB))
+}
+```
+
+## Posterior mean estimates $\mu$
+```{r, echo=FALSE, fig.width=7.8, fig.height=2.2}
+for (i in 1:length(N_cells)) {
+  ggA <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_A, sim_dt = dt[[i]]$sim_dt$sim_dt_A,
+                                  mode = "mu", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group A - Cells ", N_cells[i]))
+  ggB <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_B, sim_dt = dt[[i]]$sim_dt$sim_dt_B,
+                                  mode = "mu", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group B - Cells ", N_cells[i]))
+  ggAB <- plot_MA_estimates(fit_obj_A = dt[[i]]$fit_bbreg_A, fit_obj_B = dt[[i]]$fit_bbreg_B,
+                            mode = "mu", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                            title = paste0("Groups A and B - Cells ", N_cells[i]))
+  print(cowplot::plot_grid(ggA, ggB, ggAB, ncol = 3))
+}
+```
+
+
+## Posterior overdispersion estimates $\gamma$
+```{r, echo=FALSE, fig.width=7.8, fig.height=2.2}
+for (i in 1:length(N_cells)) {
+  ggA <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_A, sim_dt = dt[[i]]$sim_dt$sim_dt_A,
+                                  mode = "gamma", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group A - Cells ", N_cells[i]))
+  ggB <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_B, sim_dt = dt[[i]]$sim_dt$sim_dt_B,
+                                  mode = "gamma", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group B - Cells ", N_cells[i]))
+  ggAB <- plot_MA_estimates(fit_obj_A = dt[[i]]$fit_bbreg_A, fit_obj_B = dt[[i]]$fit_bbreg_B,
+                            mode = "gamma", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                            title = paste0("Groups A and B - Cells ", N_cells[i]))
+  print(cowplot::plot_grid(ggA, ggB, ggAB, ncol = 3))
+}
+```
+
+
+## Posterior residual overdispersion estimates $\epsilon$
+```{r, echo=FALSE, fig.width=7.8, fig.height=2.2}
+for (i in 1:length(N_cells)) {
+  ggA <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_A, sim_dt = dt[[i]]$sim_dt$sim_dt_A,
+                                  mode = "epsilon", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group A - Cells ", N_cells[i]))
+  ggB <- plot_posterior_estimates(fit_obj = dt[[i]]$fit_bbreg_B, sim_dt = dt[[i]]$sim_dt$sim_dt_B,
+                                  mode = "epsilon", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                                  title = paste0("Group B - Cells ", N_cells[i]))
+  ggAB <- plot_MA_estimates(fit_obj_A = dt[[i]]$fit_bbreg_A, fit_obj_B = dt[[i]]$fit_bbreg_B,
+                            mode = "epsilon", diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                            title = paste0("Groups A and B - Cells ", N_cells[i]))
+  print(cowplot::plot_grid(ggA, ggB, ggAB, ncol = 3))
+}
+```
+
+
+# Identifying differentially variable features
+## Summary of hits
+```{r, results=TRUE, message=TRUE}
+diff_analysis <- list()
+for (i in 1:length(N_cells)) {
+  diff_analysis[[i]] <- differential_test(obj_A = dt[[i]]$fit_bbreg_A, 
+                                          obj_B = dt[[i]]$fit_bbreg_B)
+}
+```
+
+## EFDR threshold grid search plots
+```{r, echo=FALSE, fig.width=7.8, fig.height=1.4}
+for (i in 1:length(N_cells)) {
+  ggM <- plot_efdr_efnr_grid_search(diff_obj = diff_analysis[[i]]$diff_mean_thresh, 
+                                    target_efdr = diff_analysis[[i]]$opts$efdr_m,
+                                    title = paste0("Diff Mean - Cells ", N_cells[i]))
+  ggG <- plot_efdr_efnr_grid_search(diff_obj = diff_analysis[[i]]$diff_disp_thresh, 
+                                    target_efdr = diff_analysis[[i]]$opts$efdr_g,
+                                    title = paste0("Diff Overdispersion - Cells ", N_cells[i]))
+  ggE <- plot_efdr_efnr_grid_search(diff_obj = diff_analysis[[i]]$diff_res_disp_thresh, 
+                                    target_efdr = diff_analysis[[i]]$opts$efdr_e,
+                                    title = paste0("Diff Residual Overdispersion - Cells ", N_cells[i]))
+  
+  print(cowplot::plot_grid(ggM, ggG, ggE, ncol = 3))
+}
+```
+
+
+## Volcano plots
+
+```{r, echo=FALSE, fig.width=8, fig.height=1.7}
+for (i in 1:length(N_cells)) {
+  ggM <- plot_volcano(diff_obj = diff_analysis[[i]]$mean_summary, mode = "mu",
+                      diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                      evidence_thresh = diff_analysis[[i]]$diff_mean_thresh$evidence_thresh,
+                      change_thresh = diff_analysis[[i]]$opts$psi_m,
+                      xlab = "Log odds ratio (A/B) change", 
+                      ylab = "Posterior evidence probability",
+                      title = paste0("Diff Mean - Cells ", N_cells[i]))
+  ggG <- plot_volcano(diff_obj = diff_analysis[[i]]$disp_summary, mode = "gamma",
+                      diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                      evidence_thresh = diff_analysis[[i]]$diff_disp_thresh$evidence_thresh,
+                      change_thresh = diff_analysis[[i]]$opts$psi_g,
+                      xlab = "Log odds ratio (A/B) change", 
+                      ylab = "Posterior evidence probability",
+                      title = paste0("Diff Overdispersion - Cells ", N_cells[i]))
+  ggE <- plot_volcano(diff_obj = diff_analysis[[i]]$res_disp_summary, mode = "epsilon",
+                      diff_feat_idx = dt[[i]]$sim_dt$diff_disp_features$feature_idx,
+                      evidence_thresh = diff_analysis[[i]]$diff_res_disp_thresh$evidence_thresh,
+                      change_thresh = diff_analysis[[i]]$opts$psi_e,
+                      xlab = "Difference (A - B)", 
+                      ylab = "Posterior evidence probability",
+                      title = paste0("Diff Residual Overdispersion - Cells ", N_cells[i]))
+  print(cowplot::plot_grid(ggM, ggG, ggE, ncol = 3))
+}
+```
+
+
+## Sample size effect
+Compute confusion matrix
+```{r}
+conf_matrix <- confusion_matrix_disp(dt = dt, diff_analysis = diff_analysis, N_cells = N_cells)
+```
+Below we show the performance of the model as we increase the total number of cells
+
+### False Discovery Rate
+```{r}
+knitr::kable(conf_matrix$fdr, digits = 3)
+```
+
+### False Negative Rate
+```{r}
+knitr::kable(conf_matrix$fnr, digits = 3)
+```
+
+### False Positive Rate
+```{r}
+knitr::kable(conf_matrix$fpr, digits = 3)
+```
+
+### True Positive Rate / Recall / Sensitivity
+```{r}
+knitr::kable(conf_matrix$tpr, digits = 3)
+```
+
+### Precision
+```{r}
+knitr::kable(conf_matrix$precision, digits = 3)
+```
+
+
+
