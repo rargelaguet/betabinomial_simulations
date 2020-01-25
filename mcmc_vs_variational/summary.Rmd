@@ -64,9 +64,9 @@ for (i in N_cells) {
 }
 ```
 
-<!-- ## Plot mean vs overdispersion for the true data
+## Plot mean vs overdispersion for the true data
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
-for (i in N_cells) {
+for (i in N_cells_subset) {
     
     par(mfrow = c(1,2))
     
@@ -85,14 +85,14 @@ for (i in N_cells) {
     )
     
 }
-``` -->
+```
 
 
 
-<!-- ## Plot mean vs overdispersion for the fitted models
+## Plot mean vs overdispersion for the fitted models
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
-for (i in N_cells) {
+for (i in N_cells_subset) {
   for (j in models) {
     
     ggA <- plot_mean_disp_fit(
@@ -108,12 +108,12 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB))
   }
 }
-``` -->
+```
 
-<!-- ## Compare posterior mean estimates $\mu$
+## Compare posterior mean estimates $\mu$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
-for (i in N_cells) {
+for (i in N_cells_subset) {
   for (j in models) {
   
     ggA <- plot_posterior_estimates(
@@ -133,12 +133,12 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-``` -->
+```
 
-<!-- ## Posterior overdispersion estimates $\gamma$
+## Posterior overdispersion estimates $\gamma$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
-for (i in N_cells) {
+for (i in N_cells_subset) {
   for (j in models) {
   
     ggA <- plot_posterior_estimates(
@@ -158,13 +158,13 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-``` -->
+```
 
 
-<!-- ## Posterior residual overdispersion estimates $\epsilon$
+## Posterior residual overdispersion estimates $\epsilon$
 
 ```{r echo=FALSE, fig.align="center", fig.height=7, fig.width=14}
-for (i in N_cells) {
+for (i in N_cells_subset) {
   for (j in models) {
   
     ggA <- plot_posterior_estimates(
@@ -184,7 +184,7 @@ for (i in N_cells) {
     print(cowplot::plot_grid(ggA, ggB, ncol = 2))
   }
 }
-``` -->
+```
 
 <!-- Extract summary statistics -->
 
