@@ -3,7 +3,7 @@
 # NOTE: There is no downstream analysis performed in this script.
 ##------------------------
 
-library(data.table)
+library(purrr)
 # library(tidyverse)
 # library(logitnorm)
 # library(gtools)
@@ -19,7 +19,7 @@ if (grepl("S34-R31YLVDR",Sys.info()['nodename'])) {
   io$out_dir <- "~/datasets/epigenetic-heterogeneity/scalability/synthetic/"
 } else if (grepl("ricard",Sys.info()['nodename'])) {
   source("/Users/ricard/bbreg/settings.R")	
-  io$out_dir <- "/Users/ricard/data/betabinomial/variational_tolerance/"
+  io$out_dir <- "/Users/ricard/data/betabinomial/variational_tolerance/data/"
 }
 
 #############
@@ -32,10 +32,10 @@ opts <- list()
 opts$total_rep <- 1
 
 # Number of cells
-opts$N_cells <- c(100)
+opts$N_cells <- seq(100,500,by=100)
 
 # Number of features
-opts$N_feat <- c(500)
+opts$N_feat <- seq(100,500,by=100)
 
 # Number of CpGs (per feature and cell? sampled from binomial?)
 opts$N_cpgs <- 15

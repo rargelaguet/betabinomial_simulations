@@ -1,3 +1,12 @@
+library(VGAM)
+require(MASS)
+require(data.table)
+require(purrr)
+require(ggpubr)
+require(RColorBrewer)
+
+outdir <- "/Users/ricard/data/betabinomial/structure_latent_space"
+
 matrix.please <- function(x) {
   m<-as.matrix(x[,-1])
   rownames(m)<-x[[1]]
@@ -15,6 +24,7 @@ simulate.iid <- function(n_features = 10, n_samples = 100, Ntotal.max=10) {
   # rho <- rep(NA,D)
   
   # Ntotal <- matrix(NA, nrow=N, ncol=D)
+  Ntotal <- matrix(Ntotal.max, nrow=N, ncol=D)
   Nmet <- matrix(NA, nrow=N, ncol=D)
   
   for (j in 1:D) {
@@ -60,6 +70,7 @@ simulate.structured <- function(n_features=100, n_samples = 50, n_factors = 5, N
 
   # sample total number of reads    
   # Ntotal <- matrix(sample(x=Ntotal.max, size=N*D, replace=T), nrow=N, ncol=D)
+  Ntotal <- matrix(Ntotal.max, nrow=N, ncol=D)
     
   # sample number of methylated reads according to the binomial likelihood
   Nmet <- matrix(rep(NA,N*D), nrow=N, ncol=D)
@@ -67,7 +78,7 @@ simulate.structured <- function(n_features=100, n_samples = 50, n_factors = 5, N
   theta <- 1/(1+exp(-(Z%*%t(W))))
   for (i in 1:N) {
     for (j in 1:D) {
-      Nmet[i,j] <- rbinom(n=1, size=Ntotal.max, prob=theta[i,j])
+      Nmet[i,j] <- rbinom(n=1, size=Ntotal[i,j], prob=theta[i,j])
     }
   }
   
